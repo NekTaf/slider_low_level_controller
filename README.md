@@ -19,3 +19,18 @@ ros2 launch slider_low_level_controller write_to_arduino.launch.py
 this reads the ```\eight_thrust_pulse``` topic and send the serial commands to the on-board Arduino board 
 
 
+# Communication setup 
+
+Domain setup (both computers)
+
+```bash
+export ROS_DOMAIN_ID=0
+```
+
+LAN setup
+
+```bash
+export ROS_IP=IP1 
+export ROS_IP=IP2 
+```
+
