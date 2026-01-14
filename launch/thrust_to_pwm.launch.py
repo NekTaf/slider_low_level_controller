@@ -13,14 +13,15 @@ def generate_launch_description():
     )
     resolution_arg = DeclareLaunchArgument(
         'resolution', 
-        default_value='64',
-        description='PWM resolution'
+        default_value='5',
+        description='Quantization resolution'
     )
     
     max_force_arg = DeclareLaunchArgument(
         'max_force', 
         default_value='0.7',
-        description='Max thruster force'
+        description='Max thruster force for on-board thrusters, \
+            not to be confused with cumulative final force '
     )
 
 

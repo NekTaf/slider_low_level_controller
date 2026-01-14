@@ -12,20 +12,29 @@ class ThrustToPWM(Node):
     def __init__(self):
         super().__init__('thrust_to_pwm')
         
-        self.declare_parameter('frequency', 10)
-        self.declare_parameter('resolution', 64)
-        self.declare_parameter('max_force', 0.7)
+        self.declare_parameter('frequency')
+        self.declare_parameter('resolution')
+        self.declare_parameter('max_force')
 
         self.frequency = self.get_parameter('frequency').get_parameter_value().integer_value
         self.resolution = self.get_parameter('resolution').get_parameter_value().integer_value
         self.max_force = self.get_parameter('max_force').get_parameter_value().double_value
-
         
         self.signals = [self.create_pwm(0, self.resolution) for i in range(8)]
         self.i = 0
         
-        self.create_subscription(Vector3, 'thrust_cmd', self.callback, QoSPresetProfiles.get_from_short_key('system_default'))
-        self.pub = self.create_publisher(UInt8MultiArray, '/eight_thrust_pulse', QoSPresetProfiles.get_from_short_key('system_default'))
+        self.create_subscription(
+            Vector3,
+            'thrust_cmd', 
+            self.callback, 
+            QoSPresetProfiles.get_from_short_key('system_default')
+            )
+        
+        self.pub = self.create_publisher(
+            UInt8MultiArray, 
+            '/eight_thrust_pulse', 
+            QoSPresetProfiles.get_from_short_key('system_default')
+            )
         
         self.create_timer(1/(self.frequency * self.resolution), self.send_signals)
         
@@ -48,23 +57,16 @@ class ThrustToPWM(Node):
         else:
             u[4] = msg.z
         
-        # A = np.array([     # Thruster matrix
-        #     [-1,     0,     1,     0,     1,     0,    -1,     0   ],
-        #     [ 0,     1,     0,     1,     0,    -1,     0,    -1   ],
-        #     [-0.14,  0.14,  0.14, -0.14, -0.14,  0.14,  0.14, -0.14],
-        # ], dtype=np.float64)
-
-        # Thrusters can only fire in one direction (+)
+        # Thrusters can only fire in one direction (+ positive)
         A = np.array([     
-        [0,     0,     1,     0,     1,     0,    0,     0   ],
-        [1,     0,     0,     0,     0,     0,    1,     0   ],
-        [ 0,     1,     0,     1,     0,    0,     0,    0   ],
-        [ 0,     0,     0,     0,     0,    1,     0,    1   ],
-        [0,  0.14,  0.14, 0, 0,  0.14,  0.14, 0],
-        [0.14,  0,  0, 0.14, 0.14,  0,  0, 0.14],
+        [0, 0, 1, 0, 1, 0, 0, 0 ],
+        [1, 0, 0, 0, 0, 0, 1, 0 ],
+        [0, 1, 0, 1, 0, 0, 0, 0 ],
+        [0, 0, 0, 0, 0, 1, 0, 1 ],
+        [0, 0.14, 0.14, 0, 0, 0.14, 0.14, 0],
+        [0.14, 0, 0, 0.14, 0.14, 0, 0, 0.14],
         ], dtype=np.float64)
-
-
+        
         # Moore–Penrose pseudoinverse
         a_pinv = np.linalg.pinv(A, rcond=1e-6)               
         f = a_pinv @ u
@@ -74,13 +76,7 @@ class ThrustToPWM(Node):
         self.signals = []
         for i in range(8):
             self.signals.append(self.create_pwm(T[i], self.resolution))
-        
-        # Probably for smoothness 
-        # for n, s in enumerate(self.signals):
-        #     if s[0] == 1 and s[1] == 0:
-        #         self.signals[n][1] = 1
-        
-        
+                
     def send_signals(self):
         self.frequency = self.get_parameter('frequency').get_parameter_value().integer_value
 
@@ -93,8 +89,15 @@ class ThrustToPWM(Node):
         self.pub.publish(req)
         
 
-    def create_pwm(self, thrust, resolution):
-                    
+    def create_pwm(self, thrust:np.ndarray, resolution:int):
+        
+        """
+        :param thrust: ideal continuous thrust per on-board thruster. Size (8,)
+        :param resolution: pwm quantization resolution 
+        
+        :return: list of individual thrust pulses 
+        """
+        
         value = thrust / self.max_force
         unit = self.max_force / resolution
         
@@ -102,7 +105,7 @@ class ThrustToPWM(Node):
             value = 0.0
         
         number_of_pulses = int(value /unit)
-
+        
         signals = [1 for _ in  range(number_of_pulses)]
         signals+= [0 for _ in  range(resolution - number_of_pulses)] 
                     
